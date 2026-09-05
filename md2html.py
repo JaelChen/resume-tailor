@@ -1,49 +1,51 @@
 #!/usr/bin/env python3
 """简历 markdown -> 可打印 HTML。零依赖。
 
-用法:
-  python md2html.py 输入.md 输出.html [--layout L] [--accent #RRGGBB] [--photo 照片] [--keep-marks]
+版式 1:1 复刻 LapisCV（https://github.com/BingyanStudio/LapisCV，MIT）：
+正文 10pt / 行高 1.8、字号层级 16 / 12 / 10.5 / 9.5pt、正文 #353a42、
+强调 #4870ad、边框 #dae3ea、页边距 13mm × 15mm、右浮动圆形头像。
 
-  --layout   版式骨架，默认 sidebar
-             sidebar   满高彩色侧栏 + 照片 + 反白姓名（Reactive-Resume gengar 式）
-             banner    顶部整块色底抬头 + 圆形照片 + 联系方式色带 + 双栏（leafish 式）
-  --accent   强调色，默认 #1f3a5f
-  --photo    证件照路径（jpg/png），内嵌为 data URI。
-             不给则两种版式都自动收掉照片位，不留空块。
-  --keep-marks  保留 [← 来源 | 相关度] 标记（审草稿用）
+用法:
+  python md2html.py 输入.md 输出.html [--accent #RRGGBB] [--photo 照片] [--keep-marks]
+
+  --accent      强调色，默认 #4870ad
+  --photo       证件照（jpg/png），内嵌为 data URI。
+                不给则保留头像框位置：屏幕上显示虚线占位，打印时隐藏但仍占位，
+                保证屏幕与打印的排版一致。
+  --keep-marks  保留 [← 来源 | 相关度] 标记（审草稿用），默认去掉
 
 markdown 约定:
   # 姓名
-  短行 -> 副标题（学校专业）；含 @ 或电话的行 -> 联系方式；求职意向… -> 意向；长段 -> 摘要
-  ## 章节    技能/教育/语言/证书/获奖 自动进侧栏，其余进主栏
-  ### 单位 ｜ 角色 ｜ 时间    渲染成两行，时间右对齐
-  *斜体行* -> 规模注释    - 列表 -> 条目
+  短行 -> 副标题；含 @ 或电话的行 -> 联系方式；求职意向… -> 意向；长段 -> 摘要
+  ## 章节                        标题按关键词自动配图标
+  ### 单位 ｜ 角色 ｜ 时间         左侧单位加粗，右侧时间同色同号
+  普通段落                       条目下的整体描述
+  - 条目                         列表
 """
 import re, sys, base64, pathlib, mimetypes
 
-SIDEBAR_SECTIONS = ("技能", "教育", "语言", "证书", "获奖")
 MARK = re.compile(r'\s*`?\[←[^\]]*\]`?')
 SPLIT = re.compile(r'\s*[｜|]\s*')
 PHONE = re.compile(r'\d{3}[-\s]?\d{4}')
 
-ICONS = {
-    "mail": '<path d="M2 4h12v8H2z" fill="none" stroke="currentColor" stroke-width="1.3"/>'
-            '<path d="M2 4l6 5 6-5" fill="none" stroke="currentColor" stroke-width="1.3"/>',
-    "phone": '<path d="M3 3h3l1.5 3.5-2 1.5a9 9 0 004.5 4.5l1.5-2L15 12v3h-1'
-             'A11 11 0 013 4z" fill="currentColor"/>',
-    "chat": '<path d="M2 3h12v8H6l-4 3z" fill="none" stroke="currentColor" stroke-width="1.3"/>',
-    "pin": '<path d="M8 1.5c2.2 0 4 1.8 4 4 0 3-4 8.5-4 8.5S4 8.5 4 5.5c0-2.2 1.8-4 4-4z"'
-           ' fill="none" stroke="currentColor" stroke-width="1.3"/>'
-           '<circle cx="8" cy="5.5" r="1.4" fill="currentColor"/>',
-}
+# LapisCV iconfont.ttf 的码位（该字体共 21 个字形）
+CONTACT_ICONS = {"phone": "e60f", "mail": "e7ca", "chat": "e611", "pin": "e600"}
+
+SECTION_ICONS = [
+    (("教育", "学历"), "e80c"),
+    (("技能", "专业", "能力"), "ecfa"),
+    (("实习", "工作", "职业"), "e618"),
+    (("项目", "作品", "主导"), "e635"),
+    (("语言", "证书", "获奖", "荣誉"), "e638"),
+]
+FALLBACK_ICON = "e631"
 
 
-def icon(kind):
-    return ('<svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true">%s</svg>'
-            % ICONS[kind])
+def ico(code):
+    return '<span class="ico">&#x%s;</span>' % code
 
 
-def classify(text):
+def contact_kind(text):
     if '@' in text:
         return 'mail'
     if PHONE.search(text):
@@ -51,6 +53,13 @@ def classify(text):
     if '微信' in text or 'wechat' in text.lower():
         return 'chat'
     return 'pin'
+
+
+def section_icon(title):
+    for keys, code in SECTION_ICONS:
+        if any(k in title for k in keys):
+            return ico(code)
+    return ico(FALLBACK_ICON)
 
 
 # ---------- 解析 ----------
@@ -99,20 +108,14 @@ def inline(s):
 
 
 def entry_head(text):
-    """### 单位 ｜ 角色 ｜ 时间  ->  两行，右侧对齐时间。"""
-    p = SPLIT.split(text)
-    when = ''
-    if len(p) > 1 and re.search(r'\d{4}[.\-/]', p[-1]):
-        when, p = p[-1], p[:-1]
-    org = p[0] if p else text
-    role = ' · '.join(p[1:])
-    out = ['<div class="entry">',
-           '<div class="row"><span class="org">%s</span>'
-           '<span class="when">%s</span></div>' % (inline(org), inline(when))]
-    if role:
-        out.append('<div class="row"><span class="role">%s</span></div>' % inline(role))
-    out.append('</div>')
-    return '\n'.join(out)
+    """### 单位 ｜ 角色 ｜ 时间 -> 左侧单位与角色，右侧时间。"""
+    parts = SPLIT.split(text)
+    right = ''
+    if len(parts) > 1 and re.search(r'\d{4}[.\-/]', parts[-1]):
+        right, parts = parts[-1], parts[:-1]
+    left = ' - '.join(parts) if parts else text
+    return ('<div class="entry-title"><h3>%s</h3><p class="when">%s</p></div>'
+            % (inline(left), inline(right)))
 
 
 def render_items(items):
@@ -135,113 +138,128 @@ def render_items(items):
             out.append(entry_head(text))
         else:
             close()
-            out.append('<p>%s</p>' % inline(text))
+            out.append('<p class="desc">%s</p>' % inline(text))
     close()
     return '\n'.join(out)
 
 
 def section_html(sec):
-    return '<section><h2>%s</h2>\n%s\n</section>' % (inline(sec['title']),
-                                                     render_items(sec['items']))
+    return ('<section><h2>%s<span>%s</span></h2>\n%s\n</section>'
+            % (section_icon(sec['title']), inline(sec['title']), render_items(sec['items'])))
 
 
-# ---------- 样式 ----------
+# ---------- 样式：1:1 对齐 LapisCV ----------
 
-COMMON = """
-@page {{ size:A4; margin:0; }}
+CSS = """
+@page {{ size:A4; margin:13mm 15mm; }}
 * {{ box-sizing:border-box; margin:0; padding:0; }}
-body {{ font:{size}/{lh} {font}; color:{ink}; background:#fff; }}
-.sheet {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff;
-          display:{sheetdisp}; }}
-h2 {{ font-size:{h2}; font-weight:700; letter-spacing:.6px; }}
-.entry {{ margin:{entrymt} 0 .8mm; }}
-.row {{ display:flex; justify-content:space-between; align-items:baseline; gap:4mm; }}
-.org {{ font-weight:700; font-size:{h3}; }}
-.role {{ color:{muted}; font-size:{meta}; }}
-.when {{ color:{muted}; font-size:{meta}; white-space:nowrap; }}
-em {{ font-style:normal; color:{muted}; font-size:{meta}; }}
-ul {{ list-style:none; }}
-li {{ position:relative; padding-left:3.4mm; margin-bottom:{gap}; }}
-li::before {{ content:""; position:absolute; left:.6mm; top:2.1mm;
-              width:1.3mm; height:1.3mm; border-radius:50%; background:{accent}; }}
-p {{ margin:.6mm 0; }}
-.ct {{ display:flex; align-items:center; gap:1.6mm; font-size:{meta}; }}
-.ct svg {{ flex:none; opacity:.85; }}
-h2, .entry {{ break-after:avoid-page; break-inside:avoid; }}
+
+body {{
+  font-family:{cjk};
+  font-size:10pt; line-height:1.8; color:{ink}; background:#fff;
+}}
+.sheet {{ width:210mm; min-height:297mm; margin:0 auto; padding:13mm 15mm; background:#fff; }}
+
+/* 抬头：全部左对齐 */
+h1 {{ font-family:{serif}; font-size:22pt; font-weight:700; line-height:1.4;
+      color:{ink}; letter-spacing:1px; }}
+.sub {{ font-size:9.5pt; color:{muted}; }}
+.cts {{ font-size:9.5pt; line-height:1.9; margin-top:.6mm; }}
+.cts .item {{ white-space:nowrap; margin-right:6mm; font-family:{mono}; }}
+.ico {{ font-family:LapisIcon; font-style:normal; color:{accent}; }}
+.cts .ico {{ font-size:10pt; margin-right:1.2mm; }}
+.intent {{ font-size:9.5pt; color:{accent}; font-weight:700; margin-top:1mm; }}
+.summary {{ font-size:9.5pt; text-align:justify; margin-top:1.8mm; }}
+
+/* 证件照：右上角方形，一寸比例，不占布局流 */
+.avatar-line {{ height:0; }}
+.avatar, .avatar-slot {{
+  display:block; position:relative; top:0; right:0; z-index:9;
+  float:right; width:25mm; height:35mm;
+  object-fit:cover; overflow:hidden;
+  border:1px solid {rule}; margin:0 0 2mm 5mm;
+}}
+.avatar-slot {{ border-style:dashed; }}
+.avatar-slot::after {{ content:"照片"; position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  color:{rule}; font-size:9pt; }}
+
+/* 章节：标题走宋体 */
+h2 {{
+  display:flex; align-items:center; gap:1.8mm;
+  font-family:{serif}; font-size:13pt; font-weight:700; color:{accent}; line-height:1;
+  margin:3.4mm 0 1.9mm; padding:1mm 0;
+  border-bottom:1px solid {faint};
+}}
+h2 .ico {{ flex:none; font-size:12pt; line-height:1; }}
+
+/* 条目 */
+.entry-title {{ display:flex; justify-content:space-between; align-items:center; gap:4mm; }}
+.entry-title h3 {{ font-family:{serif}; font-size:11pt; font-weight:700;
+                   color:{ink}; line-height:1.8; }}
+.entry-title .when {{ font-size:10pt; color:{ink}; white-space:nowrap; font-family:{mono}; }}
+.desc {{ font-size:10pt; }}
+
+/* 列表 */
+ul {{ list-style-type:'\\2022'; padding-inline-start:3mm; padding-inline-end:1mm; }}
+li {{ padding-left:1.5mm; }}
+ul ::marker {{ font-weight:bolder; color:{accent}; }}
+
+strong {{ color:{ink}; }}
+em {{ font-style:normal; color:{muted}; font-size:9.5pt; }}
+
+/* 分页 */
+h1, h2, h3, .entry-title {{ break-after:avoid-page; break-inside:avoid; }}
 li, p {{ break-inside:avoid; orphans:3; widows:3; }}
-.foot {{ padding:4mm 0; text-align:center; color:#bbb; font-size:8pt; }}
-@media print {{ .foot {{ display:none; }} .sheet {{ margin:0; }} }}
+
+.foot {{ margin-top:8mm; text-align:center; color:#b8c2cc; font-size:8pt; }}
+@media print {{
+  .foot {{ display:none; }}
+  .sheet {{ padding:0; width:auto; min-height:0; }}
+  .avatar-slot {{ visibility:hidden; }}
+}}
 """
 
-SIDEBAR = """
-.sheet {{ display:grid; grid-template-columns:62mm 1fr; }}
-.side {{ background:{accent}; color:#fff; padding:0 0 8mm; }}
-.side .photo {{ width:62mm; height:62mm; object-fit:cover; display:block; }}
-.side .idbox {{ padding:5mm 6mm 4mm; }}
-.side .idbox:first-child {{ padding-top:10mm; }}
-.side h1 {{ font-size:{h1}; font-weight:700; letter-spacing:1px; line-height:1.15; }}
-.side .sub {{ font-size:{meta}; opacity:.82; margin-top:1.5mm; line-height:1.45; }}
-.side .intent {{ font-size:{meta}; margin-top:2mm; padding-top:2mm;
-                 border-top:1px solid rgba(255,255,255,.35); opacity:.95; }}
-.side .cts {{ padding:0 6mm; display:flex; flex-direction:column; gap:1.6mm; }}
-.side .ct {{ opacity:.92; }}
-.side section {{ padding:0 6mm; margin-top:5mm; }}
-.side h2 {{ font-size:{h2s}; padding-bottom:1mm; margin-bottom:2mm;
-            border-bottom:1px solid rgba(255,255,255,.4); }}
-.side .org, .side li, .side p {{ font-size:{meta}; }}
-.side .role, .side .when, .side em {{ color:rgba(255,255,255,.75); }}
-.side .row {{ display:block; }}
-.side li::before {{ background:rgba(255,255,255,.8); }}
-.main {{ padding:9mm 10mm 8mm; }}
-.main .summary {{ font-size:{meta}; color:#444; margin-bottom:4mm;
-                  padding-bottom:3mm; border-bottom:1px solid {rule}; }}
-.main section + section {{ margin-top:5mm; }}
-.main h2 {{ color:{accent}; padding-bottom:.8mm; margin-bottom:2mm;
-            border-bottom:1.5px solid {accent}; }}
-"""
+CJK = ('SourceHanSansCN,"Source Han Sans SC","Noto Sans SC","PingFang SC",'
+       '"Microsoft YaHei","Hiragino Sans GB",sans-serif')
+SERIF = ('SourceHanSerifCN,"Source Han Serif SC","Noto Serif SC","Songti SC",'
+         'SimSun,Georgia,serif')
+MONO = 'JetBrainsMono,"JetBrains Mono","SF Mono",Consolas,' + CJK
 
-BANNER = """
-.sheet {{ display:block; }}
-.top {{ background:{tint}; padding:7mm 12mm 5mm; display:flex; gap:6mm; align-items:center; }}
-.top .photo {{ width:26mm; height:26mm; border-radius:50%; object-fit:cover;
-               flex:none; border:2px solid #fff; }}
-.top h1 {{ font-size:{h1}; color:{accent}; letter-spacing:1px; }}
-.top .sub {{ font-size:{meta}; color:#555; margin-top:1mm; }}
-.top .intent {{ font-size:{meta}; font-weight:700; color:{accent}; margin-top:1.5mm; }}
-.top .summary {{ font-size:{meta}; color:#444; margin-top:2.5mm; line-height:1.5; }}
-.band {{ background:{band}; padding:2.4mm 12mm; display:flex; flex-wrap:wrap;
-         gap:6mm; color:{accent}; }}
-.body {{ display:grid; grid-template-columns:1fr 58mm; gap:8mm; padding:6mm 12mm 8mm; }}
-section + section {{ margin-top:4.5mm; }}
-h2 {{ color:{accent}; padding-bottom:.7mm; margin-bottom:2mm;
-      border-bottom:1.5px solid {accent}; }}
-aside h2 {{ font-size:{h2s}; }}
-aside .org, aside li, aside p {{ font-size:{meta}; }}
-aside .row {{ display:block; }}
-"""
-
-LAYOUTS = {"sidebar": SIDEBAR, "banner": BANNER}
-
-METRICS = {
-    "sidebar": dict(size="10pt", lh="1.42", h1="19pt", h2="11pt", h2s="9.6pt", h3="10pt",
-                    meta="8.6pt", gap=".9mm", entrymt="3mm", sheetdisp="grid",
-                    font='-apple-system,"PingFang SC","Microsoft YaHei",sans-serif'),
-    "banner": dict(size="10.2pt", lh="1.42", h1="21pt", h2="11pt", h2s="9.8pt", h3="10.2pt",
-                   meta="8.8pt", gap=".9mm", entrymt="3mm", sheetdisp="block",
-                   font='-apple-system,"PingFang SC","Microsoft YaHei",sans-serif'),
-}
+# 字体放在本 skill 的 fonts/ 下，用绝对 file:// 引用。
+# HTML 因此不便携（发给别人会掉字体），但 PDF 会把字形嵌进去，投递的是 PDF，没问题。
+FONT_FACES = [
+    ("SourceHanSansCN", "SourceHanSansCN-Regular.ttf", "400", "normal"),
+    ("SourceHanSansCN", "SourceHanSansCN-Medium.ttf", "500", "normal"),
+    ("SourceHanSansCN", "SourceHanSansCN-Bold.ttf", "700", "normal"),
+    ("SourceHanSerifCN", "SourceHanSerifCN-Bold.ttf", "700", "normal"),
+    ("JetBrainsMono", "JetBrainsMono-Regular.ttf", "400", "normal"),
+    ("LapisIcon", "iconfont.ttf", "400", "normal"),
+]
 
 
-def shade(hexcolor, ratio, toward=255):
+def font_faces():
+    d = pathlib.Path(__file__).resolve().parent / 'fonts'
+    out = []
+    for family, fname, weight, style in FONT_FACES:
+        f = d / fname
+        if f.exists():
+            out.append('@font-face{font-family:"%s";src:url("%s") format("truetype");'
+                       'font-weight:%s;font-style:%s;font-display:block;}'
+                       % (family, f.as_uri(), weight, style))
+    return '\n'.join(out)
+
+
+def rgba(hexcolor, alpha):
     r, g, b = (int(hexcolor[i:i + 2], 16) for i in (1, 3, 5))
-    f = lambda c: round(c + (toward - c) * ratio)
-    return '#%02x%02x%02x' % (f(r), f(g), f(b))
+    return 'rgba(%d,%d,%d,%s)' % (r, g, b, alpha)
 
 
-def css(layout, accent):
-    v = dict(METRICS[layout], accent=accent, ink="#1a1a1a", muted="#666", rule="#d0d4da",
-             tint=shade(accent, .90), band=shade(accent, .80), dark=shade(accent, .25, 0))
-    return (COMMON + LAYOUTS[layout]).format(**v)
+def build_css(accent):
+    return font_faces() + CSS.format(
+        ink="#353a42", accent=accent, rule="#dae3ea",
+        faint=rgba(accent, "0.4"), muted="#6b7480",
+        cjk=CJK, serif=SERIF, mono=MONO)
 
 
 def photo_uri(path):
@@ -252,67 +270,145 @@ def photo_uri(path):
     return 'data:%s;base64,%s' % (mime, base64.b64encode(p.read_bytes()).decode())
 
 
-def contacts_html(items):
-    return '\n'.join('<div class="ct">%s<span>%s</span></div>'
-                     % (icon(classify(c)), inline(c)) for c in items)
+def build(d, photo):
+    cts = ''.join('<span class="item">%s%s</span>'
+                  % (ico(CONTACT_ICONS[contact_kind(c)]), inline(c))
+                  for c in d['contacts'])
+    avatar = ('<img class="avatar" src="%s" alt="">' % photo if photo
+              else '<span class="avatar-slot"></span>')
+    head = ['<h1>%s</h1>' % inline(d['name'])]
+    if d['subtitle']:
+        head.append('<p class="sub">%s</p>' % inline(d['subtitle']))
+    if cts:
+        head.append('<p class="cts">%s</p>' % cts)
+    if d['intent']:
+        head.append('<p class="intent">求职意向：%s</p>' % inline(d['intent']))
+    if d['summary']:
+        head.append('<p class="summary">%s</p>' % inline(d['summary']))
+    return ('<div class="sheet"><p class="avatar-line">%s</p>\n%s\n%s</div>'
+            % (avatar, '\n'.join(head),
+               '\n'.join(section_html(s) for s in d['sections'])))
 
 
-def build(layout, d, photo):
-    side = [s for s in d['sections'] if s['title'].startswith(SIDEBAR_SECTIONS)]
-    main = [s for s in d['sections'] if s not in side]
-    name, sub, intent, summary = (inline(d['name']), inline(d['subtitle']),
-                                  inline(d['intent']), inline(d['summary']))
-    cts = contacts_html(d['contacts'])
+# ---------- 自动转 PDF ----------
 
-    if layout == 'sidebar':
-        img = '<img class="photo" src="%s" alt="">' % photo if photo else ''
-        return ('<div class="sheet"><div class="side">%s'
-                '<div class="idbox"><h1>%s</h1><div class="sub">%s</div>'
-                '<div class="intent">求职意向：%s</div></div>'
-                '<div class="cts">%s</div>%s</div>'
-                '<div class="main"><p class="summary">%s</p>%s</div></div>'
-                % (img, name, sub, intent, cts,
-                   '\n'.join(section_html(s) for s in side),
-                   summary, '\n'.join(section_html(s) for s in main)))
+CHROME_PATHS = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+]
+CHROME_NAMES = ["google-chrome", "chromium", "chromium-browser", "microsoft-edge", "chrome"]
 
-    if layout == 'banner':
-        img = '<img class="photo" src="%s" alt="">' % photo if photo else ''
-        return ('<div class="sheet"><div class="top">%s<div><h1>%s</h1>'
-                '<div class="sub">%s</div><div class="intent">求职意向：%s</div>'
-                '<div class="summary">%s</div></div></div>'
-                '<div class="band">%s</div>'
-                '<div class="body"><main>%s</main><aside>%s</aside></div></div>'
-                % (img, name, sub, intent, summary, cts,
-                   '\n'.join(section_html(s) for s in main),
-                   '\n'.join(section_html(s) for s in side)))
 
-    raise ValueError('unknown layout: %s' % layout)
+def find_chrome():
+    import os, shutil
+    local = os.environ.get("LOCALAPPDATA", "")
+    cands = list(CHROME_PATHS)
+    if local:
+        cands.insert(0, os.path.join(local, r"Google\Chrome\Application\chrome.exe"))
+    for p in cands:
+        if pathlib.Path(p).exists():
+            return p
+    for n in CHROME_NAMES:
+        p = shutil.which(n)
+        if p:
+            return p
+    return None
+
+
+def to_pdf(html_path, pdf_path):
+    """无头 Chrome / Edge 打印成 PDF。返回 (成功, 说明)。"""
+    import subprocess, tempfile
+    exe = find_chrome()
+    if not exe:
+        return False, "没找到 Chrome 或 Edge，请手动打开 HTML 按 Ctrl/⌘+P 导出"
+    with tempfile.TemporaryDirectory() as prof:
+        cmd = [exe, "--headless=new", "--disable-gpu", "--no-sandbox",
+               "--allow-file-access-from-files",
+               "--user-data-dir=" + prof,
+               "--no-pdf-header-footer",
+               "--print-to-pdf=" + str(pdf_path),
+               pathlib.Path(html_path).resolve().as_uri()]
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=120)
+        except Exception as e:
+            return False, "调用失败：%s" % e
+    if pathlib.Path(pdf_path).exists() and pathlib.Path(pdf_path).stat().st_size > 1000:
+        return True, exe
+    return False, (r.stderr.decode("utf-8", "replace")[-300:] or "未知错误")
+
+
+def pdf_pages(pdf_path):
+    """数 PDF 页数，用于如实报给用户。"""
+    try:
+        d = pathlib.Path(pdf_path).read_bytes()
+        n = len(re.findall(rb'/Type\s*/Page[^sR]', d))
+        return n or None
+    except Exception:
+        return None
+
+
+def safe_name(s, cjk_only=False):
+    """文件名片段：去非法字符与空格；cjk_only 时只取开头的中文姓名。"""
+    s = re.sub(r'[\\/:*?"<>|]+', '', s)
+    if cjk_only:
+        m = re.match(r'[一-龥·\s]+', s)
+        if m:
+            s = m.group(0)
+    return re.sub(r'\s+', '', s).strip(' -')
 
 
 def main():
     a = sys.argv[1:]
-    opts = {'--layout': 'sidebar', '--accent': '#1f3a5f', '--photo': ''}
+    opts = {'--accent': '#4870ad', '--photo': '', '--company': '', '--out-dir': ''}
     for flag in list(opts):
         if flag in a:
             i = a.index(flag)
             opts[flag] = a[i + 1]
             del a[i:i + 2]
     keep = '--keep-marks' in a
+    want_pdf = '--pdf' in a
     files = [x for x in a if not x.startswith('--')]
-    layout = opts['--layout']
-    if len(files) < 2 or layout not in LAYOUTS:
+    if not files:
         print(__doc__)
         sys.exit(1)
+
     d = parse(pathlib.Path(files[0]).read_text(encoding='utf-8'), keep)
+
+    if len(files) > 1:
+        out_html = pathlib.Path(files[1])
+    else:
+        stem = '-'.join(x for x in (safe_name(d['name'], cjk_only=True),
+                                    safe_name(opts['--company']),
+                                    safe_name(d['intent'])) if x) or '简历'
+        out_dir = pathlib.Path(opts['--out-dir'] or pathlib.Path(files[0]).parent)
+        out_html = out_dir / (stem + '.html')
+    out_html.parent.mkdir(parents=True, exist_ok=True)
+
     html = ('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
             '<title>%s</title><style>%s</style></head><body>%s'
-            '<p class="foot">版式 %s｜Ctrl / ⌘ + P 导出 PDF：纸张 A4、边距「无」、缩放「默认」、'
-            '勾选「背景图形」、取消页眉页脚</p></body></html>'
-            % (d['name'] or '简历', css(layout, opts['--accent']),
-               build(layout, d, photo_uri(opts['--photo'])), layout))
-    pathlib.Path(files[1]).write_text(html, encoding='utf-8')
-    print('ok [%s] -> %s  %d bytes%s'
-          % (layout, files[1], len(html), '  含照片' if opts['--photo'] else '  无照片'))
+            '<p class="foot">Ctrl / ⌘ + P 导出 PDF：纸张 A4、边距「默认」、缩放「默认」、'
+            '取消页眉页脚</p></body></html>'
+            % (out_html.stem, build_css(opts['--accent']),
+               build(d, photo_uri(opts['--photo']))))
+    out_html.write_text(html, encoding='utf-8')
+    print('HTML -> %s  (%d bytes%s)'
+          % (out_html, len(html), '，含照片' if opts['--photo'] else '，头像框留位'))
+
+    if want_pdf:
+        pdf = out_html.with_suffix('.pdf')
+        ok, info = to_pdf(out_html, pdf)
+        if ok:
+            n = pdf_pages(pdf)
+            print('PDF  -> %s  (%.1f KB，用 %s)'
+                  % (pdf, pdf.stat().st_size / 1024, pathlib.Path(info).name))
+            print('页数 -> %s 页  ← 如实告诉用户，超一页且第二页不足半页就按 SKILL.md 的顺序压缩'
+                  % (n if n else '数不出来，请用户打开确认'))
+        else:
+            print('PDF  x  %s' % info)
 
 
 main()

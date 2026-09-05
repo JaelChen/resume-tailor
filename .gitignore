@@ -12,6 +12,9 @@ raw/
 简历*.md
 简历*.html
 
+# 字体是版式的一部分，要跟着仓库走
+!fonts/*.ttf
+
 __pycache__/
 *.pyc
 .DS_Store
