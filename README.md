@@ -63,25 +63,29 @@ Windows 上把 `~` 换成 `%USERPROFILE%`。豆包手机版可以直接说「安
 
 换电脑搬这个文件夹，skill 本身丢了随时能拷回来。
 
-## 排版
+## 排版与导出
 
-`md2html.py` 零依赖，只用标准库。
+`md2html.py` 零依赖，只用标准库。一条命令同时出 HTML 和 PDF：
 
 ```bash
-python md2html.py 简历.md 简历.html --layout sidebar --photo 照片.jpg
+python md2html.py 简历.md --company "公司名" --out-dir <jobs目录> --pdf --photo 照片.jpg
 ```
 
 | 参数 | 说明 |
 | --- | --- |
-| `--layout sidebar` | 满高彩色侧栏 + 照片 + 反白姓名（默认） |
-| `--layout banner` | 顶部色块抬头 + 圆形照片 + 联系方式色带 + 双栏 |
-| `--accent #1f3a5f` | 强调色 |
-| `--photo 路径` | 内嵌证件照；不给则自动收掉照片位，不留空块 |
-| `--keep-marks` | 保留来源标记，审草稿用；定稿不加 |
+| `--pdf` | 调本机 Chrome / Edge 无头模式直接打印成 PDF，并报告实际页数 |
+| `--company` | 参与文件命名 |
+| `--out-dir` | 输出目录，一般用该岗位的 jobs 子目录 |
+| `--photo 路径` | 内嵌证件照；不给则右上角留虚线框并提醒补图 |
+| `--no-photo` | 确定不放照片，连虚线框一起去掉 |
+| `--accent #4870ad` | 强调色 |
+| `--keep-marks` | 保留 `[← 来源 \| 相关度]` 标记，审草稿用；定稿不加 |
 
-版式骨架参考了 [Reactive-Resume](https://github.com/AmruthPillai/Reactive-Resume) 的 gengar 与 leafish。
+文件自动命名为 `<中文姓名>-<公司名>-<岗位名>.html` 与同名 `.pdf`，HR 收到附件一眼能看出是谁投的哪个岗位。
 
-打印时在 Chrome 打印设置里**勾上「背景图形」**，否则侧栏色块全白；边距选「无」，边距已做在 CSS 里。
+版式 1:1 复刻 [LapisCV](https://github.com/BingyanStudio/LapisCV)（MIT）：正文 10pt / 行高 1.8，标题走思源宋体、正文走思源黑体、数字走 JetBrains Mono，强调色 `#4870ad`，页边距 13mm × 15mm。`fonts/` 下的四款字体随仓库分发，HTML 以 `file://` 引用，PDF 导出时会子集化嵌入——所以 **HTML 不便携，PDF 便携**，投递用 PDF。
+
+找不到 Chrome 或 Edge 时脚本会明确报错，那时才需要手动打开 HTML 按 Ctrl / ⌘ + P 导出，纸张选 A4、取消页眉页脚。
 
 ## 写法规则
 
