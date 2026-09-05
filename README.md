@@ -12,7 +12,11 @@
 
 ## 装
 
-把本目录放进 Agent 的 skills 目录：
+clone 进 Agent 的 skills 目录即可：
+
+```bash
+git clone https://github.com/JaelChen/resume-tailor.git ~/.claude/skills/resume-tailor
+```
 
 | Agent | 路径 |
 | --- | --- |
@@ -20,6 +24,8 @@
 | Codex | `~/.codex/skills/resume-tailor/` |
 | 通用 Agents | `~/.agents/skills/resume-tailor/` |
 | 豆包 | 见其 Skill 安装说明，需专业版 |
+
+Windows 上把 `~` 换成 `%USERPROFILE%`。豆包手机版可以直接说「安装这个 GitHub 仓库的 skill」。
 
 读不了 skill 目录的环境，把 `SKILL.md` 全文粘进对话当提示词也能跑，只是没有自动触发。
 
