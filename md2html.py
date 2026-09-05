@@ -12,6 +12,7 @@
   --photo       证件照（jpg/png），内嵌为 data URI。
                 不给则保留头像框位置：屏幕上显示虚线占位，打印时隐藏但仍占位，
                 保证屏幕与打印的排版一致。
+  --no-photo    确定不放照片，连虚线框一起去掉
   --keep-marks  保留 [← 来源 | 相关度] 标记（审草稿用），默认去掉
 
 markdown 约定:
@@ -270,12 +271,16 @@ def photo_uri(path):
     return 'data:%s;base64,%s' % (mime, base64.b64encode(p.read_bytes()).decode())
 
 
-def build(d, photo):
+def build(d, photo, no_photo=False):
     cts = ''.join('<span class="item">%s%s</span>'
                   % (ico(CONTACT_ICONS[contact_kind(c)]), inline(c))
                   for c in d['contacts'])
-    avatar = ('<img class="avatar" src="%s" alt="">' % photo if photo
-              else '<span class="avatar-slot"></span>')
+    if photo:
+        avatar = '<img class="avatar" src="%s" alt="">' % photo
+    elif no_photo:
+        avatar = ''
+    else:
+        avatar = '<span class="avatar-slot"></span>'
     head = ['<h1>%s</h1>' % inline(d['name'])]
     if d['subtitle']:
         head.append('<p class="sub">%s</p>' % inline(d['subtitle']))
@@ -371,6 +376,7 @@ def main():
             del a[i:i + 2]
     keep = '--keep-marks' in a
     want_pdf = '--pdf' in a
+    no_photo = '--no-photo' in a
     files = [x for x in a if not x.startswith('--')]
     if not files:
         print(__doc__)
@@ -393,10 +399,15 @@ def main():
             '<p class="foot">Ctrl / ⌘ + P 导出 PDF：纸张 A4、边距「默认」、缩放「默认」、'
             '取消页眉页脚</p></body></html>'
             % (out_html.stem, build_css(opts['--accent']),
-               build(d, photo_uri(opts['--photo']))))
+               build(d, photo_uri(opts['--photo']), no_photo)))
     out_html.write_text(html, encoding='utf-8')
     print('HTML -> %s  (%d bytes%s)'
-          % (out_html, len(html), '，含照片' if opts['--photo'] else '，头像框留位'))
+          % (out_html, len(html), '，含照片' if opts['--photo'] else '，头像框空着'))
+    if not opts['--photo'] and not no_photo:
+        print('照片 -> 未提供，右上角是空的虚线框。'
+              '  ← 必须提醒用户：这个岗位建议放照片的话，请给一张证件照原图'
+              '（短边 600px 以上），再加 --photo 重跑一次；确定不放就明确说一声，'
+              '我把框去掉。')
 
     if want_pdf:
         pdf = out_html.with_suffix('.pdf')
