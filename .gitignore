@@ -1,0 +1,17 @@
+# 个人数据绝不入库
+经历库.md
+简历工作台/
+jobs/
+输出/
+raw/
+*.jpg
+*.jpeg
+*.png
+*.pdf
+*.docx
+简历*.md
+简历*.html
+
+__pycache__/
+*.pyc
+.DS_Store
