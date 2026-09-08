@@ -63,7 +63,7 @@ description: 按岗位 JD 定制简历。读简历或口述建立纯事实经历
 
 ### 顺手检查更新（每次会话最多做一次，失败就当没这回事）
 
-本地版本 **v1.3.1**。开场白说完之后，在 skill 目录里跑一次：
+本地版本 **v1.4**。开场白说完之后，在 skill 目录里跑一次：
 
 ```
 git -C <skill目录> fetch --quiet && git -C <skill目录> rev-list --count HEAD..@{u}
@@ -430,7 +430,7 @@ python <skill目录>/md2html.py <jobs目录>/简历.md \
 
 ### 字体
 
-`fonts/` 下是 LapisCV 的思源黑体、思源宋体、JetBrains Mono 和 iconfont，HTML 以绝对 `file://` 路径引用。字体缺失时自动退回系统字体，不报错。
+`fonts/` 下是思源黑体、思源宋体的常用字子集（`TailorSansCN` / `TailorSerifCN`，改名是 OFL 保留字体名的要求，见 `fonts/README.md`）、JetBrains Mono 和 LapisCV iconfont，HTML 以绝对 `file://` 路径引用。字体缺失或子集里没有该字时逐字退回系统字体，不报错、不出豆腐块。
 
 **生成的 HTML 不便携**（发给别人会掉字体），但 PDF 会把字形子集化嵌入，投递用 PDF，不受影响。
 

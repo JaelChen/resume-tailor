@@ -92,7 +92,7 @@ python md2html.py 简历.md --company "公司名" --out-dir <jobs目录> --pdf -
 
 文件自动命名为 `<中文姓名>-<公司名>-<岗位名>.html` 与同名 `.pdf`，HR 收到附件一眼能看出是谁投的哪个岗位。
 
-版式 1:1 复刻 [LapisCV](https://github.com/BingyanStudio/LapisCV)（MIT）：正文 10pt / 行高 1.8，标题走思源宋体、正文走思源黑体、数字走 JetBrains Mono，强调色 `#4870ad`，页边距 13mm × 15mm。`fonts/` 下的四款字体随仓库分发，HTML 以 `file://` 引用，PDF 导出时会子集化嵌入——所以 **HTML 不便携，PDF 便携**，投递用 PDF。
+版式 1:1 复刻 [LapisCV](https://github.com/BingyanStudio/LapisCV)（MIT）：正文 10pt / 行高 1.8，标题走思源宋体、正文走思源黑体、数字走 JetBrains Mono，强调色 `#4870ad`，页边距 13mm × 15mm。`fonts/` 下的字体随仓库分发，其中两款思源是常用字子集（7565 字，44MB → 11MB，缺字逐字回退系统字体），HTML 以 `file://` 引用，PDF 导出时会再子集化嵌入——所以 **HTML 不便携，PDF 便携**，投递用 PDF。
 
 找不到 Chrome 或 Edge 时脚本会明确报错，那时才需要手动打开 HTML 按 Ctrl / ⌘ + P 导出，纸张选 A4、取消页眉页脚。
 

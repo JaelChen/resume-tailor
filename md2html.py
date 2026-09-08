@@ -221,19 +221,22 @@ li, p {{ break-inside:avoid; orphans:3; widows:3; }}
 }}
 """
 
-CJK = ('SourceHanSansCN,"Source Han Sans SC","Noto Sans SC","PingFang SC",'
+# TailorSansCN / TailorSerifCN 是思源黑体 / 思源宋体的常用字子集（见 fonts/README.md）。
+# 改名不是为了好看：OFL 的保留字体名条款禁止修改版沿用 'Source'，子集就是修改版。
+# 回退栈里保留系统装的完整思源，子集缺字时逐字回退，不会变豆腐块。
+CJK = ('TailorSansCN,"Source Han Sans SC","Noto Sans SC","PingFang SC",'
        '"Microsoft YaHei","Hiragino Sans GB",sans-serif')
-SERIF = ('SourceHanSerifCN,"Source Han Serif SC","Noto Serif SC","Songti SC",'
+SERIF = ('TailorSerifCN,"Source Han Serif SC","Noto Serif SC","Songti SC",'
          'SimSun,Georgia,serif')
 MONO = 'JetBrainsMono,"JetBrains Mono","SF Mono",Consolas,' + CJK
 
 # 字体放在本 skill 的 fonts/ 下，用绝对 file:// 引用。
 # HTML 因此不便携（发给别人会掉字体），但 PDF 会把字形嵌进去，投递的是 PDF，没问题。
 FONT_FACES = [
-    ("SourceHanSansCN", "SourceHanSansCN-Regular.ttf", "400", "normal"),
-    ("SourceHanSansCN", "SourceHanSansCN-Medium.ttf", "500", "normal"),
-    ("SourceHanSansCN", "SourceHanSansCN-Bold.ttf", "700", "normal"),
-    ("SourceHanSerifCN", "SourceHanSerifCN-Bold.ttf", "700", "normal"),
+    ("TailorSansCN", "TailorSansCN-Regular.ttf", "400", "normal"),
+    ("TailorSansCN", "TailorSansCN-Medium.ttf", "500", "normal"),
+    ("TailorSansCN", "TailorSansCN-Bold.ttf", "700", "normal"),
+    ("TailorSerifCN", "TailorSerifCN-Bold.ttf", "700", "normal"),
     ("JetBrainsMono", "JetBrainsMono-Regular.ttf", "400", "normal"),
     ("LapisIcon", "iconfont.ttf", "400", "normal"),
 ]
