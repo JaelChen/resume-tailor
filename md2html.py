@@ -279,7 +279,8 @@ def photo_uri(path):
 
 
 def build(d, photo, no_photo=False):
-    cts = ''.join('<span class="item">%s%s</span>'
+    # 项之间留空白，否则 nowrap 的项连成一整段，塞不进照片旁边时整行掉到照片下面
+    cts = ' '.join('<span class="item">%s%s</span>'
                   % (ico(CONTACT_ICONS[contact_kind(c)]), inline(c))
                   for c in d['contacts'])
     if photo:
