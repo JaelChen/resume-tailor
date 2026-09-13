@@ -30,7 +30,7 @@ SPLIT = re.compile(r'\s*[｜|]\s*')
 PHONE = re.compile(r'\d{3}[-\s]?\d{4}')
 
 # LapisCV iconfont.ttf 的码位（该字体共 21 个字形）
-CONTACT_ICONS = {"phone": "e60f", "mail": "e7ca", "chat": "e611", "pin": "e600"}
+CONTACT_ICONS = {"phone": "e60f", "mail": "e7ca", "chat": "e611", "pin": "e600", "github": "e799", "link": "e69c"}
 
 SECTION_ICONS = [
     (("教育", "学历"), "e80c"),
@@ -53,6 +53,10 @@ def contact_kind(text):
         return 'phone'
     if '微信' in text or 'wechat' in text.lower():
         return 'chat'
+    if 'github.com' in text.lower():
+        return 'github'
+    if re.search(r'[\w-]+\.(me|com|cn|io|dev|top|xyz)(/|$)', text.lower()):
+        return 'link'
     return 'pin'
 
 
