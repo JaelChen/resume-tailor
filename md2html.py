@@ -9,6 +9,7 @@
   python md2html.py 输入.md 输出.html [--accent #RRGGBB] [--photo 照片] [--keep-marks]
 
   --accent      强调色，默认 #4870ad
+  --margin      页边距（CSS 写法，上下 左右），默认 13mm 15mm；一页版挤不下可用 10mm 12mm
   --photo       证件照（jpg/png），内嵌为 data URI。
                 不给则保留头像框位置：屏幕上显示虚线占位，打印时隐藏但仍占位，
                 保证屏幕与打印的排版一致。
@@ -156,14 +157,14 @@ def section_html(sec):
 # ---------- 样式：1:1 对齐 LapisCV ----------
 
 CSS = """
-@page {{ size:A4; margin:13mm 15mm; }}
+@page {{ size:A4; margin:{margin}; }}
 * {{ box-sizing:border-box; margin:0; padding:0; }}
 
 body {{
   font-family:{cjk};
   font-size:10pt; line-height:1.8; color:{ink}; background:#fff;
 }}
-.sheet {{ width:210mm; min-height:297mm; margin:0 auto; padding:13mm 15mm; background:#fff; }}
+.sheet {{ width:210mm; min-height:297mm; margin:0 auto; padding:{margin}; background:#fff; }}
 
 /* 抬头：全部左对齐 */
 h1 {{ font-family:{serif}; font-size:22pt; font-weight:700; line-height:1.4;
@@ -263,9 +264,9 @@ def rgba(hexcolor, alpha):
     return 'rgba(%d,%d,%d,%s)' % (r, g, b, alpha)
 
 
-def build_css(accent):
+def build_css(accent, margin='13mm 15mm'):
     return font_faces() + CSS.format(
-        ink="#353a42", accent=accent, rule="#dae3ea",
+        ink="#353a42", accent=accent, rule="#dae3ea", margin=margin,
         faint=rgba(accent, "0.4"), muted="#6b7480",
         cjk=CJK, serif=SERIF, mono=MONO)
 
@@ -376,7 +377,8 @@ def safe_name(s, cjk_only=False):
 
 def main():
     a = sys.argv[1:]
-    opts = {'--accent': '#4870ad', '--photo': '', '--company': '', '--out-dir': ''}
+    opts = {'--accent': '#4870ad', '--photo': '', '--company': '', '--out-dir': '',
+            '--margin': '13mm 15mm'}
     for flag in list(opts):
         if flag in a:
             i = a.index(flag)
@@ -406,7 +408,7 @@ def main():
             '<title>%s</title><style>%s</style></head><body>%s'
             '<p class="foot">Ctrl / ⌘ + P 导出 PDF：纸张 A4、边距「默认」、缩放「默认」、'
             '取消页眉页脚</p></body></html>'
-            % (out_html.stem, build_css(opts['--accent']),
+            % (out_html.stem, build_css(opts['--accent'], opts['--margin']),
                build(d, photo_uri(opts['--photo']), no_photo)))
     out_html.write_text(html, encoding='utf-8')
     print('HTML -> %s  (%d bytes%s)'
